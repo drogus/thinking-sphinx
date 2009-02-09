@@ -11,7 +11,7 @@ module ThinkingSphinx
         return true unless ThinkingSphinx.updates_enabled?
         
         config = ThinkingSphinx::Configuration.instance
-        client = Riddle::Client.new config.address, config.port
+        client = ThinkingSphinx.create_client(config)
         
         client.update(
           @index,

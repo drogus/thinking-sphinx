@@ -13,7 +13,7 @@ module ThinkingSphinx
           ThinkingSphinx.deltas_enabled?
         
         config = ThinkingSphinx::Configuration.instance
-        client = Riddle::Client.new config.address, config.port
+        client = ThinkingSphinx.create_client(config)
         
         client.update(
           core_index_name(model),

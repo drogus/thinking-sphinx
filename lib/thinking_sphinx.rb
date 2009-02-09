@@ -52,7 +52,24 @@ module ThinkingSphinx
       self.ids = ids
     end
   end
-  
+
+  # Creates client from config and passing attributes needed by daemon_controller
+  def self.create_client(config)
+    client = Riddle::Client.new config.address, config.port
+    client.start_command = "#{config.bin_path}searchd --pidfile --config #{config.config_file}"
+    client.pid_file = config.pid_file
+    client.log_file = config.searchd_log_file
+    client.before_start = Proc.new {
+      config.build
+      FileUtils.mkdir_p config.searchd_file_path
+      cmd = "#{config.bin_path}indexer --config #{config.config_file} --all"
+      cmd << " --rotate" if ThinkingSphinx.sphinx_running?
+      system cmd
+    }
+
+    client
+  end
+
   # The collection of indexed models. Keep in mind that Rails lazily loads
   # its classes, so this may not actually be populated with _all_ the models
   # that have Sphinx indexes.

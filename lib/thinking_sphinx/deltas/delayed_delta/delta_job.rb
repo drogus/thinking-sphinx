@@ -12,8 +12,8 @@ module ThinkingSphinx
           ThinkingSphinx.deltas_enabled?
         
         config = ThinkingSphinx::Configuration.instance
-        client = Riddle::Client.new config.address, config.port
-        
+        client = ThinkingSphinx.create_client(config)
+
         output = `#{config.bin_path}indexer --config #{config.config_file} --rotate #{index}`
         puts output unless ThinkingSphinx.suppress_delta_output?
         

@@ -111,8 +111,8 @@ describe "ThinkingSphinx::ActiveRecord" do
       )
       @client = Riddle::Client.stub_instance(:update => true)
       @person = Person.find(:first)
-      
-      Riddle::Client.stub_method(:new => @client)
+     
+      ThinkingSphinx.stub_method(:create_client => @client)
       Person.sphinx_indexes.each { |index| index.stub_method(:delta? => false) }
       @person.stub_method(:in_core_index? => true)
     end
@@ -120,8 +120,8 @@ describe "ThinkingSphinx::ActiveRecord" do
     it "should create a client using the Configuration's address and port" do
       @person.toggle_deleted
       
-      Riddle::Client.should have_received(:new).with(
-        @configuration.address, @configuration.port
+      ThinkingSphinx.should have_received(:create_client).with(
+        @configuration
       )
     end
     

@@ -407,7 +407,7 @@ module ThinkingSphinx
       # 
       def client_from_options(options = {})
         config = ThinkingSphinx::Configuration.instance
-        client = Riddle::Client.new config.address, config.port
+        client = ThinkingSphinx.create_client(config)
         klass  = options[:class]
         index_options = klass ? klass.sphinx_index_options : {}
 

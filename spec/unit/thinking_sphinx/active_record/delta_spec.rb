@@ -81,6 +81,7 @@ describe "ThinkingSphinx::ActiveRecord::Delta" do
       )
       
       @client = Riddle::Client.stub_instance(:update => true)
+      ThinkingSphinx.stub_method(:create_client => @client)
       Riddle::Client.stub_method(:new => @client)
     end
     
