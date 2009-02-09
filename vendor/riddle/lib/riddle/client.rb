@@ -108,7 +108,8 @@ module Riddle
       :match_mode, :sort_mode, :sort_by, :weights, :id_range, :filters,
       :group_by, :group_function, :group_clause, :group_distinct, :cut_off,
       :retry_count, :retry_delay, :anchor, :index_weights, :rank_mode,
-      :max_query_time, :field_weights, :timeout, :overrides, :select
+      :max_query_time, :field_weights, :timeout, :overrides, :select,
+      :pid_file, :log_file, :before_start, :start_command
     attr_reader :queue
     
     # Can instantiate with a specific server and port - otherwise it assumes
@@ -456,7 +457,18 @@ module Riddle
     end
     
     def initialise_connection
-      socket = TCPSocket.new @server, @port
+      @controller = DaemonController.new(
+        :identifier => 'Sphinx search server',
+        :start_command => @start_command || "searchd -c config/sphinx.conf",
+        :before_start => @before_start || Proc.new {},
+        :ping_command => lambda { TCPSocket.new(@server, @port) },
+        :pid_file => @pid_file || 'tmp/pids/sphinx.pid',
+        :log_file => @log_file || 'log/sphinx.log'
+      )
+
+      socket = @controller.connect do
+        TCPSocket.new @server, @port
+      end
       
       # Checking version
       version = socket.recv(4).unpack('N*').first
