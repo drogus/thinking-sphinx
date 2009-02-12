@@ -4,5 +4,7 @@ class Post < ActiveRecord::Base
   define_index do
     indexes subject
     indexes content
+
+    has comments(:id), :as => :comment_ids, :source => :ranged_query
   end
 end

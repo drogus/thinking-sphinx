@@ -11,3 +11,9 @@ Comment.create(
   :content  => "+1",
   :post_id  => 1
 )
+
+Comment.create(
+  :name     => "Menno",
+  :content  => "Second post!",
+  :post_id  => 1
+)
