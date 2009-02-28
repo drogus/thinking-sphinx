@@ -129,7 +129,7 @@ describe "ThinkingSphinx::ActiveRecord" do
       @person.toggle_deleted
       
       @client.should have_received(:update).with(
-        "person_core", ["sphinx_deleted"], {@person.sphinx_document_id => 1}
+        "person_core", ["sphinx_deleted"], {@person.sphinx_document_id => [1]}
       )
     end
     
@@ -139,7 +139,7 @@ describe "ThinkingSphinx::ActiveRecord" do
       @person.toggle_deleted
       
       @client.should_not have_received(:update).with(
-        "person_core", ["sphinx_deleted"], {@person.sphinx_document_id => 1}
+        "person_core", ["sphinx_deleted"], {@person.sphinx_document_id => [1]}
       )
     end
     
@@ -160,7 +160,7 @@ describe "ThinkingSphinx::ActiveRecord" do
       @person.toggle_deleted
       
       @client.should have_received(:update).with(
-        "person_delta", ["sphinx_deleted"], {@person.sphinx_document_id => 1}
+        "person_delta", ["sphinx_deleted"], {@person.sphinx_document_id => [1]}
       )
     end
     
@@ -172,7 +172,7 @@ describe "ThinkingSphinx::ActiveRecord" do
       @person.toggle_deleted
       
       @client.should_not have_received(:update).with(
-        "person_delta", ["sphinx_deleted"], {@person.sphinx_document_id => 1}
+        "person_delta", ["sphinx_deleted"], {@person.sphinx_document_id => [1]}
       )
     end
     
@@ -184,7 +184,7 @@ describe "ThinkingSphinx::ActiveRecord" do
       @person.toggle_deleted
 
       @client.should_not have_received(:update).with(
-        "person_delta", ["sphinx_deleted"], {@person.sphinx_document_id => 1}
+        "person_delta", ["sphinx_deleted"], {@person.sphinx_document_id => [1]}
       )
     end
 
@@ -193,7 +193,7 @@ describe "ThinkingSphinx::ActiveRecord" do
       @person.toggle_deleted
       
       @client.should_not have_received(:update).with(
-        "person_delta", ["sphinx_deleted"], {@person.sphinx_document_id => 1}
+        "person_delta", ["sphinx_deleted"], {@person.sphinx_document_id => [1]}
       )
     end
     
@@ -205,7 +205,7 @@ describe "ThinkingSphinx::ActiveRecord" do
       @person.toggle_deleted
       
       @client.should_not have_received(:update).with(
-        "person_delta", ["sphinx_deleted"], {@person.sphinx_document_id => 1}
+        "person_delta", ["sphinx_deleted"], {@person.sphinx_document_id => [1]}
       )
     end
     
