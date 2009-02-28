@@ -9,7 +9,7 @@ module ThinkingSphinx
   # associations. Which can get messy. Use Index.link!, it really helps.
   # 
   class Attribute
-    attr_accessor :alias, :columns, :associations, :model, :faceted, :source
+    attr_accessor :alias, :columns, :associations, :model, :faceted, :source, :query_sql
     
     # To create a new attribute, you'll need to pass in either a single Column
     # or an array of them, and some (optional) options.
@@ -18,6 +18,7 @@ module ThinkingSphinx
     # - :as     => :alias_name
     # - :type   => :attribute_type
     # - :source => :field, :query, :ranged_query
+    # - :query_sql  => specify sql for query (with :source => :query)
     #
     # Alias is only required in three circumstances: when there's
     # another attribute or field with the same name, when the column name is
@@ -77,6 +78,8 @@ module ThinkingSphinx
       @type     = options[:type]
       @faceted  = options[:facet]
       @source   = options[:source]
+      @query_sql    = options[:query_sql]
+      @query_sql.gsub!("\n", '') if @query_sql
     end
     
     # Get the part of the SELECT clause related to this attribute. Don't forget
@@ -206,9 +209,9 @@ module ThinkingSphinx
             
             primary_key  = "#{association_table}.#{quote_column(primary_key)}"
             foreign_key  = "#{association_table}.#{quote_column(association.reflection.primary_key_name)}"
-            foreign_key_with_id = "#{foreign_key} #{ThinkingSphinx.unique_id_expression(offset)} AS `id`"
+            foreign_key_with_id = "#{foreign_key} #{ThinkingSphinx.unique_id_expression(offset)} AS id"
             
-            query        = "SELECT #{foreign_key_with_id}, #{primary_key} AS #{quote_column(unique_name)} FROM #{association_table}"
+            query        = query_sql || "SELECT #{foreign_key_with_id}, #{primary_key} AS #{quote_column(unique_name)} FROM #{association_table}"
             query_clause = "WHERE #{foreign_key} >= $start AND #{foreign_key} <= $end"
             range_query  = "SELECT MIN(#{foreign_key}), MAX(#{foreign_key}) FROM #{association_table}"
           end
