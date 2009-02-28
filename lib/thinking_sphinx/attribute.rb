@@ -79,7 +79,7 @@ module ThinkingSphinx
       @faceted  = options[:facet]
       @source   = options[:source]
       @query_sql    = options[:query_sql]
-      @query_sql.gsub!("\n", '') if @query_sql
+      @query_sql.gsub!("\n", ' ') if @query_sql
     end
     
     # Get the part of the SELECT clause related to this attribute. Don't forget
