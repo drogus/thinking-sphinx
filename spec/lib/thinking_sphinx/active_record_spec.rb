@@ -204,7 +204,7 @@ describe "ThinkingSphinx::ActiveRecord" do
     
     it "should update the core index's deleted flag if in core index" do
       @client.should_receive(:update).with(
-        "person_core", ["sphinx_deleted"], {@person.sphinx_document_id => [1]}
+        "person_core", ["sphinx_deleted"], {@person.sphinx_document_id => 1}
       )
       
       @person.toggle_deleted
@@ -213,7 +213,11 @@ describe "ThinkingSphinx::ActiveRecord" do
     it "shouldn't update the core index's deleted flag if the record isn't in it" do
       @person.stub_method(:in_core_index? => false)
       @client.should_not_receive(:update).with(
+<<<<<<< HEAD:spec/lib/thinking_sphinx/active_record_spec.rb
         "person_core", ["sphinx_deleted"], {@person.sphinx_document_id => [1]}
+=======
+        "person_core", ["sphinx_deleted"], {@person.sphinx_document_id => 1}
+>>>>>>> freelancing-god/master:spec/lib/thinking_sphinx/active_record_spec.rb
       )
       
       @person.toggle_deleted
@@ -233,7 +237,11 @@ describe "ThinkingSphinx::ActiveRecord" do
       Person.sphinx_indexes.each { |index| index.stub_method(:delta? => true) }
       @person.delta = true
       @client.should_receive(:update).with(
+<<<<<<< HEAD:spec/lib/thinking_sphinx/active_record_spec.rb
         "person_delta", ["sphinx_deleted"], {@person.sphinx_document_id => [1]}
+=======
+        "person_delta", ["sphinx_deleted"], {@person.sphinx_document_id => 1}
+>>>>>>> freelancing-god/master:spec/lib/thinking_sphinx/active_record_spec.rb
       )
       
       @person.toggle_deleted
@@ -244,7 +252,11 @@ describe "ThinkingSphinx::ActiveRecord" do
       Person.sphinx_indexes.each { |index| index.stub_method(:delta? => true) }
       @person.delta = false
       @client.should_not_receive(:update).with(
+<<<<<<< HEAD:spec/lib/thinking_sphinx/active_record_spec.rb
         "person_delta", ["sphinx_deleted"], {@person.sphinx_document_id => [1]}
+=======
+        "person_delta", ["sphinx_deleted"], {@person.sphinx_document_id => 1}
+>>>>>>> freelancing-god/master:spec/lib/thinking_sphinx/active_record_spec.rb
       )
       
       @person.toggle_deleted
@@ -255,7 +267,11 @@ describe "ThinkingSphinx::ActiveRecord" do
       Person.sphinx_indexes.each { |index| index.stub_method(:delta? => true) }
       @person.delta = 0
       @client.should_not_receive(:update).with(
+<<<<<<< HEAD:spec/lib/thinking_sphinx/active_record_spec.rb
         "person_delta", ["sphinx_deleted"], {@person.sphinx_document_id => [1]}
+=======
+        "person_delta", ["sphinx_deleted"], {@person.sphinx_document_id => 1}
+>>>>>>> freelancing-god/master:spec/lib/thinking_sphinx/active_record_spec.rb
       )
 
       @person.toggle_deleted
@@ -264,7 +280,11 @@ describe "ThinkingSphinx::ActiveRecord" do
     it "shouldn't update the delta index if delta indexes are disabled" do
       ThinkingSphinx.stub_method(:deltas_enabled? => true)
       @client.should_not_receive(:update).with(
+<<<<<<< HEAD:spec/lib/thinking_sphinx/active_record_spec.rb
         "person_delta", ["sphinx_deleted"], {@person.sphinx_document_id => [1]}
+=======
+        "person_delta", ["sphinx_deleted"], {@person.sphinx_document_id => 1}
+>>>>>>> freelancing-god/master:spec/lib/thinking_sphinx/active_record_spec.rb
       )
       
       @person.toggle_deleted
@@ -275,7 +295,11 @@ describe "ThinkingSphinx::ActiveRecord" do
       Person.sphinx_indexes.each { |index| index.stub_method(:delta? => true) }
       @person.delta = true
       @client.should_not_receive(:update).with(
+<<<<<<< HEAD:spec/lib/thinking_sphinx/active_record_spec.rb
         "person_delta", ["sphinx_deleted"], {@person.sphinx_document_id => [1]}
+=======
+        "person_delta", ["sphinx_deleted"], {@person.sphinx_document_id => 1}
+>>>>>>> freelancing-god/master:spec/lib/thinking_sphinx/active_record_spec.rb
       )
       
       @person.toggle_deleted
