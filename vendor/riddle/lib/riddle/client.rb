@@ -502,6 +502,8 @@ module Riddle
                   else
                     TCPSocket.new @server, @port
                   end
+      
+
       rescue Errno::ECONNREFUSED => e
         retry if (tries += 1) < 5
         raise Riddle::ConnectionError,
