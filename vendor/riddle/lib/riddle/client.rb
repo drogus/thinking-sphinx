@@ -411,10 +411,9 @@ module Riddle
       
       rows, cols = response.next_int, response.next_int
       
-      (0...rows).collect do |row|
-        (0...cols).inject([]) do |array, col|
-          array << response.next
-        end
+      (0...rows).inject({}) do |hash, row|
+        hash[response.next.to_sym] = response.next
+        hash
       end
     end
     
@@ -478,14 +477,8 @@ module Riddle
     end
     
     def initialise_connection
-      socket =  if @connection_proc.respond_to?(:call)
-                  @connection_proc.call(self)
-                elsif @@connection_proc.respond_to?(:call)
-                  @@connection_proc.call(self)
-                else
-                  TCPSocket.new @server, @port
-                end
-      
+      socket = initialise_socket
+
       # Send version
       socket.send [1].pack('N'), 0
       
@@ -494,6 +487,25 @@ module Riddle
       if version < 1
         socket.close
         raise VersionError, "Can only connect to searchd version 1.0 or better, not version #{version}"
+      end
+      
+      socket
+    end
+    
+    def initialise_socket
+      tries = 0
+      begin
+        socket =  if @connection_proc.respond_to?(:call)
+                    @connection_proc.call(self)
+                  elsif @@connection_proc.respond_to?(:call)
+                    @@connection_proc.call(self)
+                  else
+                    TCPSocket.new @server, @port
+                  end
+      rescue Errno::ECONNREFUSED => e
+        retry if (tries += 1) < 5
+        raise Riddle::ConnectionError,
+          "Connection to #{@server} on #{@port} failed. #{e.message}"
       end
       
       socket
@@ -510,7 +522,7 @@ module Riddle
       if message.respond_to?(:force_encoding)
         message = message.force_encoding('ASCII-8BIT')
       end
-          
+      
       connect do |socket|
         case command
         when :search
@@ -520,6 +532,10 @@ module Riddle
             Commands[command], Versions[command],
             4+message.length,  messages.length
           ].pack("nnNN") + message, 0
+        when :status
+          socket.send [
+            Commands[command], Versions[command], 4, 1
+          ].pack("nnNN"), 0
         else
           socket.send [
             Commands[command], Versions[command], message.length

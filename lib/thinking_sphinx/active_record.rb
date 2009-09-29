@@ -13,6 +13,15 @@ module ThinkingSphinx
       base.class_eval do
         class_inheritable_array :sphinx_indexes, :sphinx_facets
         class << self
+          
+          def set_sphinx_primary_key(attribute)
+            @sphinx_primary_key_attribute = attribute
+          end
+          
+          def primary_key_for_sphinx
+            @sphinx_primary_key_attribute || primary_key
+          end
+          
           # Allows creation of indexes for Sphinx. If you don't do this, there
           # isn't much point trying to search (or using this plugin at all,
           # really).
@@ -66,6 +75,7 @@ module ThinkingSphinx
             return unless ThinkingSphinx.define_indexes?
             
             self.sphinx_indexes ||= []
+            self.sphinx_facets  ||= []
             index = ThinkingSphinx::Index::Builder.generate(self, &block)
             
             self.sphinx_indexes << index
@@ -144,6 +154,14 @@ module ThinkingSphinx
           
           def sphinx_name
             self.name.underscore.tr(':/\\', '_')
+          end
+          
+          def sphinx_index_names
+            klass = source_of_sphinx_index
+            names = ["#{klass.sphinx_name}_core"]
+            names << "#{klass.sphinx_name}_delta" if sphinx_delta?
+            
+            names
           end
           
           private
@@ -265,13 +283,23 @@ module ThinkingSphinx
       # nothing
     end
     
-    def sphinx_document_id
-      (self.id * ThinkingSphinx.indexed_models.size) +
-        ThinkingSphinx.indexed_models.index(self.class.source_of_sphinx_index.name)
+    # Returns the unique integer id for the object. This method uses the
+    # attribute hash to get around ActiveRecord always mapping the #id method
+    # to whatever the real primary key is (which may be a unique string hash).
+    # 
+    # @return [Integer] Unique record id for the purposes of Sphinx.
+    # 
+    def primary_key_for_sphinx
+      @primary_key_for_sphinx ||= read_attribute(self.class.primary_key_for_sphinx)
     end
     
+    def sphinx_document_id
+      primary_key_for_sphinx * ThinkingSphinx.indexed_models.size +
+        ThinkingSphinx.indexed_models.index(self.class.source_of_sphinx_index.name)
+    end
+
     private
-    
+
     def sphinx_index_name(suffix)
       "#{self.class.source_of_sphinx_index.name.underscore.tr(':/\\', '_')}_#{suffix}"
     end

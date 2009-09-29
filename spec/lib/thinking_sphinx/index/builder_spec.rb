@@ -53,6 +53,35 @@ describe ThinkingSphinx::Index::Builder do
     end
   end
   
+  describe 'aliased field' do
+    before :each do
+      @index = ThinkingSphinx::Index::Builder.generate(Person) do
+        indexes first_name, :as => 'name'
+      end
+      
+      @source = @index.sources.first
+    end
+    
+    it "should store the alias as a symbol for consistency" do
+      @source.fields.last.unique_name.should == :name
+    end
+  end
+  
+  describe 'aliased attribute' do
+    before :each do
+      @index = ThinkingSphinx::Index::Builder.generate(Person) do
+        indexes first_name
+        has :id, :as => 'real_id'
+      end
+      
+      @source = @index.sources.first
+    end
+    
+    it "should store the alias as a symbol for consistency" do
+      @source.attributes.last.unique_name.should == :real_id
+    end
+  end
+  
   describe "sortable field" do
     before :each do
       @index = ThinkingSphinx::Index::Builder.generate(Person) do
@@ -220,6 +249,77 @@ describe ThinkingSphinx::Index::Builder do
     it "should set the attribute column to be the same as the field" do
       @source.attributes.last.columns.length.should == 1
       @source.attributes.last.columns.first.__name.should == :last_name
+    end
+  end
+  
+  describe 'faceted manual MVA' do
+    before :each do
+      @index = ThinkingSphinx::Index::Builder.generate(Person) do
+        indexes first_name
+        has 'SQL STATEMENT', :type => :multi, :as => :sql, :facet => true
+      end
+      
+      @source = @index.sources.first
+    end
+    
+    after :each do
+      Person.sphinx_facets.delete_at(-1)
+    end
+    
+    it "should have two attributes alongside the four internal ones" do
+      @source.attributes.length.should == 6
+    end
+    
+    it "should set the facet attribute name to have the _facet suffix" do
+      @source.attributes.last.unique_name.should == :sql_facet
+    end
+    
+    it "should keep the original attribute's name set as requested" do
+      @source.attributes[-2].unique_name.should == :sql
+    end
+    
+    it "should set the attribute type to multi" do
+      @source.attributes.last.type.should == :multi
+    end
+    
+    it "should set the attribute column to be the same as the field" do
+      @source.attributes.last.columns.length.should == 1
+      @source.attributes.last.columns.first.__name.should == 'SQL STATEMENT'
+    end
+  end
+  
+  describe 'faceted MVA field' do
+    before :each do
+      @index = ThinkingSphinx::Index::Builder.generate(Person) do
+        indexes tags(:name), :as => :tags, :facet => true
+      end
+      
+      @source = @index.sources.first
+    end
+    
+    after :each do
+      Person.sphinx_facets.delete_at(-1)
+    end
+    
+    it "should have one field" do
+      @source.fields.length.should == 1
+    end
+    
+    it "should have one attribute alongside the four internal ones" do
+      @source.attributes.length.should == 5
+    end
+    
+    it "should set the attribute name to have the _facet suffix" do
+      @source.attributes.last.unique_name.should == :tags_facet
+    end
+    
+    it "should set the attribute type to multi" do
+      @source.attributes.last.type.should == :multi
+    end
+    
+    it "should set the attribute column to be the same as the field" do
+      @source.attributes.last.columns.length.should == 1
+      @source.attributes.last.columns.first.__name.should == :name
     end
   end
   

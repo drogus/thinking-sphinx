@@ -1,20 +1,21 @@
 require 'spec/spec_helper'
 
-describe "ThinkingSphinx::ActiveRecord" do
-  describe "define_index method" do
+describe ThinkingSphinx::ActiveRecord do
+  describe '.define_index' do
     before :each do
       module ::TestModule
         class TestModel < ActiveRecord::Base; end
       end
       
-      TestModule::TestModel.stub_methods(
+      TestModule::TestModel.stub!(
         :before_save    => true,
         :after_commit   => true,
         :after_destroy  => true
       )
       
-      @index = ThinkingSphinx::Index.stub_instance(:delta? => false)
-      ThinkingSphinx::Index::Builder.stub_method(:generate => @index)
+      @index = ThinkingSphinx::Index.new(TestModule::TestModel)
+      @index.stub!(:delta? => false)
+      ThinkingSphinx::Index::Builder.stub!(:generate => @index)
     end
     
     after :each do
@@ -25,12 +26,12 @@ describe "ThinkingSphinx::ActiveRecord" do
     end
     
     it "should do nothing if indexes are disabled" do
-      ThinkingSphinx.stub_method(:define_indexes? => false)
+      ThinkingSphinx.define_indexes = false
+      ThinkingSphinx::Index.should_not_receive(:new)
       
       TestModule::TestModel.define_index {}
-      ThinkingSphinx::Index.should_not have_received(:new)
       
-      ThinkingSphinx.unstub_method(:define_indexes?)
+      ThinkingSphinx.define_indexes = true
     end
     
     it "should add a new index to the model" do
@@ -60,33 +61,31 @@ describe "ThinkingSphinx::ActiveRecord" do
     end
     
     it "should add before_save and after_commit hooks to the model if delta indexing is enabled" do
-      @index.stub_method(:delta? => true)
+      @index.stub!(:delta? => true)
+      TestModule::TestModel.should_receive(:before_save).with(:toggle_delta)
+      TestModule::TestModel.should_receive(:after_commit).with(:index_delta)
       
       TestModule::TestModel.define_index do; end
-      
-      TestModule::TestModel.should have_received(:before_save).with(:toggle_delta)
-      TestModule::TestModel.should have_received(:after_commit).with(:index_delta)
     end
     
     it "should not add before_save and after_commit hooks to the model if delta indexing is disabled" do
-      TestModule::TestModel.define_index do; end
+      TestModule::TestModel.should_not_receive(:before_save).with(:toggle_delta)
+      TestModule::TestModel.should_not_receive(:after_commit).with(:index_delta)
       
-      TestModule::TestModel.should_not have_received(:before_save).with(:toggle_delta)
-      TestModule::TestModel.should_not have_received(:after_commit).with(:index_delta)
+      TestModule::TestModel.define_index do; end
     end
     
     it "should add an after_destroy hook with delta indexing enabled" do
-      @index.stub_method(:delta? => true)
+      @index.stub!(:delta? => true)
+      TestModule::TestModel.should_receive(:after_destroy).with(:toggle_deleted)
       
       TestModule::TestModel.define_index do; end
-      
-      TestModule::TestModel.should have_received(:after_destroy).with(:toggle_deleted)
     end
     
     it "should add an after_destroy hook with delta indexing disabled" do
-      TestModule::TestModel.define_index do; end
+      TestModule::TestModel.should_receive(:after_destroy).with(:toggle_deleted)
       
-      TestModule::TestModel.should have_received(:after_destroy).with(:toggle_deleted)
+      TestModule::TestModel.define_index do; end
     end
     
     it "should return the new index" do
@@ -94,7 +93,7 @@ describe "ThinkingSphinx::ActiveRecord" do
     end
     
     it "should die quietly if there is a database error" do
-      ThinkingSphinx::Index::Builder.stub_method_to_raise(:generate => Mysql::Error)
+      ThinkingSphinx::Index::Builder.stub(:generate) { raise Mysql::Error }
       
       lambda {
         TestModule::TestModel.define_index
@@ -102,7 +101,7 @@ describe "ThinkingSphinx::ActiveRecord" do
     end
     
     it "should die noisily if there is a non-database error" do
-      ThinkingSphinx::Index::Builder.stub_method_to_raise(:generate => StandardError)
+      ThinkingSphinx::Index::Builder.stub(:generate) { raise StandardError }
       
       lambda {
         TestModule::TestModel.define_index
@@ -154,7 +153,7 @@ describe "ThinkingSphinx::ActiveRecord" do
     end
   end
 
-  describe "source_of_sphinx_index method" do
+  describe '.source_of_sphinx_index' do
     it "should return self if model defines an index" do
       Person.source_of_sphinx_index.should == Person
     end
@@ -164,13 +163,13 @@ describe "ThinkingSphinx::ActiveRecord" do
     end
   end
   
-  describe "to_crc32 method" do
+  describe '.to_crc32' do
     it "should return an integer" do
       Person.to_crc32.should be_a_kind_of(Integer)
     end
   end
     
-  describe "to_crc32s method" do
+  describe '.to_crc32s' do
     it "should return an array" do
       Person.to_crc32s.should be_a_kind_of(Array)
     end
@@ -178,10 +177,10 @@ describe "ThinkingSphinx::ActiveRecord" do
     
   describe "toggle_deleted method" do
     before :each do
-      ThinkingSphinx.stub_method(:sphinx_running? => true)
+      ThinkingSphinx.stub!(:sphinx_running? => true)
       
       @configuration = ThinkingSphinx::Configuration.instance
-      @configuration.stub_methods(
+      @configuration.stub!(
         :address  => "an address",
         :port     => 123
       )
@@ -189,17 +188,17 @@ describe "ThinkingSphinx::ActiveRecord" do
       @client.stub!(:update => true)
       @person = Person.find(:first)
       
-      Riddle::Client.stub_method(:new => @client)
-      Person.sphinx_indexes.each { |index| index.stub_method(:delta? => false) }
-      @person.stub_method(:in_core_index? => true)
+      Riddle::Client.stub!(:new => @client)
+      Person.sphinx_indexes.each { |index| index.stub!(:delta? => false) }
+      @person.stub!(:in_core_index? => true)
     end
     
     it "should create a client using the Configuration's address and port" do
-      @person.toggle_deleted
-      
-      Riddle::Client.should have_received(:new).with(
+      Riddle::Client.should_receive(:new).with(
         @configuration.address, @configuration.port
       )
+      
+      @person.toggle_deleted
     end
     
     it "should update the core index's deleted flag if in core index" do
@@ -211,7 +210,7 @@ describe "ThinkingSphinx::ActiveRecord" do
     end
     
     it "shouldn't update the core index's deleted flag if the record isn't in it" do
-      @person.stub_method(:in_core_index? => false)
+      @person.stub!(:in_core_index? => false)
       @client.should_not_receive(:update).with(
 <<<<<<< HEAD:spec/lib/thinking_sphinx/active_record_spec.rb
         "person_core", ["sphinx_deleted"], {@person.sphinx_document_id => [1]}
@@ -224,17 +223,16 @@ describe "ThinkingSphinx::ActiveRecord" do
     end
     
     it "shouldn't attempt to update the deleted flag if sphinx isn't running" do
-      ThinkingSphinx.stub_method(:sphinx_running? => false)
+      ThinkingSphinx.stub!(:sphinx_running? => false)
       @client.should_not_receive(:update)
+      @person.should_not_receive(:in_core_index?)
       
       @person.toggle_deleted
-      
-      @person.should_not have_received(:in_core_index?)
     end
     
     it "should update the delta index's deleted flag if delta indexes are enabled and the instance's delta is true" do
-      ThinkingSphinx.stub_method(:deltas_enabled? => true)
-      Person.sphinx_indexes.each { |index| index.stub_method(:delta? => true) }
+      ThinkingSphinx.deltas_enabled = true
+      Person.sphinx_indexes.each { |index| index.stub!(:delta? => true) }
       @person.delta = true
       @client.should_receive(:update).with(
 <<<<<<< HEAD:spec/lib/thinking_sphinx/active_record_spec.rb
@@ -248,8 +246,8 @@ describe "ThinkingSphinx::ActiveRecord" do
     end
     
     it "should not update the delta index's deleted flag if delta indexes are enabled and the instance's delta is false" do
-      ThinkingSphinx.stub_method(:deltas_enabled? => true)
-      Person.sphinx_indexes.each { |index| index.stub_method(:delta? => true) }
+      ThinkingSphinx.deltas_enabled = true
+      Person.sphinx_indexes.each { |index| index.stub!(:delta? => true) }
       @person.delta = false
       @client.should_not_receive(:update).with(
 <<<<<<< HEAD:spec/lib/thinking_sphinx/active_record_spec.rb
@@ -263,8 +261,8 @@ describe "ThinkingSphinx::ActiveRecord" do
     end
     
     it "should not update the delta index's deleted flag if delta indexes are enabled and the instance's delta is equivalent to false" do
-      ThinkingSphinx.stub_method(:deltas_enabled? => true)
-      Person.sphinx_indexes.each { |index| index.stub_method(:delta? => true) }
+      ThinkingSphinx.deltas_enabled = true
+      Person.sphinx_indexes.each { |index| index.stub!(:delta? => true) }
       @person.delta = 0
       @client.should_not_receive(:update).with(
 <<<<<<< HEAD:spec/lib/thinking_sphinx/active_record_spec.rb
@@ -278,7 +276,7 @@ describe "ThinkingSphinx::ActiveRecord" do
     end
 
     it "shouldn't update the delta index if delta indexes are disabled" do
-      ThinkingSphinx.stub_method(:deltas_enabled? => true)
+      ThinkingSphinx.deltas_enabled = true
       @client.should_not_receive(:update).with(
 <<<<<<< HEAD:spec/lib/thinking_sphinx/active_record_spec.rb
         "person_delta", ["sphinx_deleted"], {@person.sphinx_document_id => [1]}
@@ -291,8 +289,8 @@ describe "ThinkingSphinx::ActiveRecord" do
     end
     
     it "should not update the delta index if delta indexing is disabled" do
-      ThinkingSphinx.stub_method(:deltas_enabled? => false)
-      Person.sphinx_indexes.each { |index| index.stub_method(:delta? => true) }
+      ThinkingSphinx.deltas_enabled = false
+      Person.sphinx_indexes.each { |index| index.stub!(:delta? => true) }
       @person.delta = true
       @client.should_not_receive(:update).with(
 <<<<<<< HEAD:spec/lib/thinking_sphinx/active_record_spec.rb
@@ -306,11 +304,9 @@ describe "ThinkingSphinx::ActiveRecord" do
     end
     
     it "should not update either index if updates are disabled" do
-      ThinkingSphinx.stub_methods(
-        :updates_enabled? => false,
-        :deltas_enabled   => true
-      )
-      Person.sphinx_indexes.each { |index| index.stub_method(:delta? => true) }
+      ThinkingSphinx.updates_enabled = false
+      ThinkingSphinx.deltas_enabled  = true
+      Person.sphinx_indexes.each { |index| index.stub!(:delta? => true) }
       @person.delta = true
       @client.should_not_receive(:update)
       
@@ -349,5 +345,44 @@ describe "ThinkingSphinx::ActiveRecord" do
     offset      = ThinkingSphinx.indexed_models.index("Beta")
     
     (beta.id * model_count + offset).should == beta.sphinx_document_id
+  end
+  
+  describe '#primary_key_for_sphinx' do
+    before :each do
+      @person = Person.find(:first)
+    end
+    
+    after :each do
+      Person.set_sphinx_primary_key nil
+    end
+    
+    it "should return the id by default" do
+      @person.primary_key_for_sphinx.should == @person.id
+    end
+    
+    it "should use the sphinx primary key to determine the value" do
+      Person.set_sphinx_primary_key :first_name
+      @person.primary_key_for_sphinx.should == @person.first_name
+    end
+    
+    it "should not use accessor methods but the attributes hash" do
+      id = @person.id
+      @person.stub!(:id => 'unique_hash')
+      @person.primary_key_for_sphinx.should == id
+    end
+  end
+  
+  describe '.sphinx_index_names' do
+    it "should return the core index" do
+      Alpha.sphinx_index_names.should == ['alpha_core']
+    end
+    
+    it "should return the delta index if enabled" do
+      Beta.sphinx_index_names.should == ['beta_core', 'beta_delta']
+    end
+    
+    it "should return the superclass with an index definition" do
+      Parent.sphinx_index_names.should == ['person_core', 'person_delta']
+    end
   end
 end

@@ -25,7 +25,7 @@ module ThinkingSphinx
     HashOptions   = [:conditions, :with, :without, :with_all]
     ArrayOptions  = [:classes, :without_ids]
     
-    attr_reader :args, :options, :results
+    attr_reader :args, :options
     
     # Deprecated. Use ThinkingSphinx.search
     def self.search(*args)
@@ -66,6 +66,24 @@ module ThinkingSphinx
     def to_a
       populate
       @array
+    end
+    
+    # Indication of whether the request has been made to Sphinx for the search
+    # query.
+    # 
+    # @return [Boolean] true if the results have been requested.
+    # 
+    def populated?
+      !!@populated
+    end
+    
+    # The query result hash from Riddle.
+    # 
+    # @return [Hash] Raw Sphinx results
+    # 
+    def results
+      populate
+      @results
     end
     
     def method_missing(method, *args, &block)
@@ -136,7 +154,8 @@ module ThinkingSphinx
     # @return [Integer]
     # 
     def total_pages
-      @total_pages ||= (total_entries / per_page.to_f).ceil
+      populate
+      @total_pages ||= (@results[:total] / per_page.to_f).ceil
     end
     # Compatibility with older versions of will_paginate
     alias_method :page_count, :total_pages
@@ -158,6 +177,13 @@ module ThinkingSphinx
       (current_page - 1) * per_page
     end
     
+    def indexes
+      return options[:index] if options[:index]
+      return '*' if classes.empty?
+      
+      classes.collect { |klass| klass.sphinx_index_names }.flatten.join(',')
+    end
+    
     def each_with_groupby_and_count(&block)
       populate
       results[:matches].each_with_index do |match, index|
@@ -175,16 +201,21 @@ module ThinkingSphinx
     end
     
     def excerpt_for(string, model = nil)
-      if model.nil? && options[:classes].length == 1
-        model ||= options[:classes].first
+      if model.nil? && one_class
+        model ||= one_class
       end
       
       populate
       client.excerpts(
         :docs   => [string],
         :words  => results[:words].keys.join(' '),
-        :index  => "#{model.sphinx_name}_core"
+        :index  => "#{model.source_of_sphinx_index.sphinx_name}_core"
       ).first
+    end
+    
+    def search(*args)
+      merge_search ThinkingSphinx::Search.new(*args)
+      self
     end
     
     private
@@ -200,7 +231,7 @@ module ThinkingSphinx
       retry_on_stale_index do
         begin
           log "Querying Sphinx: #{query}"
-          @results = client.query query, index, comment
+          @results = client.query query, indexes, comment
         rescue Errno::ECONNREFUSED => err
           raise ThinkingSphinx::ConnectionError,
             'Connection to Sphinx Daemon (searchd) failed.'
@@ -242,8 +273,8 @@ module ThinkingSphinx
     def client
       client = config.client
       
-      index_options = (options[:classes] || []).length != 1 ?
-        {} : options[:classes].first.sphinx_indexes.first.local_options
+      index_options = one_class ?
+        one_class.sphinx_indexes.first.local_options : {}
       
       [
         :max_matches, :group_by, :group_function, :group_clause,
@@ -297,6 +328,14 @@ module ThinkingSphinx
       end
     end
     
+    def classes
+      @classes ||= options[:classes] || []
+    end
+    
+    def one_class
+      @one_class ||= classes.length != 1 ? nil : classes.first
+    end
+    
     def query
       @query ||= begin
         q = @args.join(' ') << conditions_as_query
@@ -309,7 +348,7 @@ module ThinkingSphinx
       
       # Soon to be deprecated.
       keys = @options[:conditions].keys.reject { |key|
-        attributes.include?(key)
+        attributes.include?(key.to_sym)
       }
       
       ' ' + keys.collect { |key|
@@ -333,10 +372,6 @@ module ThinkingSphinx
           "*#{proper}*"
         end
       end
-    end
-    
-    def index
-      options[:index] || '*'
     end
     
     def comment
@@ -380,9 +415,9 @@ module ThinkingSphinx
     end
     
     def field_names
-      return [] if (options[:classes] || []).length != 1
+      return [] unless one_class
       
-      options[:classes].first.sphinx_indexes.collect { |index|
+      one_class.sphinx_indexes.collect { |index|
         index.fields.collect { |field| field.unique_name }
       }.flatten
     end
@@ -404,7 +439,7 @@ module ThinkingSphinx
       weights = options[:index_weights] || {}
       weights.keys.inject({}) do |hash, key|
         if key.is_a?(Class)
-          name = ThinkingSphinx::Index.name(key)
+          name = ThinkingSphinx::Index.name_for(key)
           hash["#{name}_core"]  = weights[key]
           hash["#{name}_delta"] = weights[key]
         else
@@ -426,7 +461,7 @@ module ThinkingSphinx
     def internal_filters
       filters = [Riddle::Client::Filter.new('sphinx_deleted', [0])]
       
-      class_crcs = (options[:classes] || []).collect { |klass|
+      class_crcs = classes.collect { |klass|
         klass.to_crc32s
       }.flatten
       
@@ -443,7 +478,12 @@ module ThinkingSphinx
     
     def condition_filters
       (options[:conditions] || {}).collect { |attrib, value|
-        if attributes.include?(attrib)
+        if attributes.include?(attrib.to_sym)
+          puts <<-MSG
+Deprecation Warning: filters on attributes should be done using the :with
+option, not :conditions. For example:
+  :with => {:#{attrib} => #{value.inspect}}
+MSG
           Riddle::Client::Filter.new attrib.to_s, filter_value(value)
         else
           nil
@@ -484,6 +524,8 @@ module ThinkingSphinx
         value.collect { |v| filter_value(v) }.flatten
       when Time
         value.respond_to?(:in_time_zone) ? [value.utc.to_i] : [value.to_i]
+      when NilClass
+        0
       else
         Array(value)
       end
@@ -493,10 +535,10 @@ module ThinkingSphinx
       return {} unless options[:geo] || (options[:lat] && options[:lng])
       
       {
-        :latitude       => options[:geo] ? options[:geo].first : options[:lat],
-        :longitude      => options[:geo] ? options[:geo].last  : options[:lng],
-        :latitude_attr  => latitude_attr,
-        :longitude_attr => longitude_attr
+        :latitude   => options[:geo] ? options[:geo].first : options[:lat],
+        :longitude  => options[:geo] ? options[:geo].last  : options[:lng],
+        :latitude_attribute  => latitude_attr.to_s,
+        :longitude_attribute => longitude_attr.to_s
       }
     end
     
@@ -513,15 +555,15 @@ module ThinkingSphinx
     end
     
     def index_option(key)
-      return nil if options[:classes].length != 1
+      return nil unless one_class
       
-      options[:classes].first.sphinx_indexes.collect { |index|
+      one_class.sphinx_indexes.collect { |index|
         index.local_options[key]
       }.compact.first
     end
     
     def attribute(*keys)
-      return nil if options[:classes].length != 1
+      return nil unless one_class
       
       keys.detect { |key|
         attributes.include?(key)
@@ -529,9 +571,9 @@ module ThinkingSphinx
     end
     
     def attributes
-      return [] if (options[:classes] || []).length != 1
+      return [] unless one_class
       
-      attributes = options[:classes].first.sphinx_indexes.collect { |index|
+      attributes = one_class.sphinx_indexes.collect { |index|
         index.attributes.collect { |attrib| attrib.unique_name }
       }.flatten
     end
@@ -554,7 +596,7 @@ module ThinkingSphinx
       instances = ids.length > 0 ? klass.find(
         :all,
         :joins      => options[:joins],
-        :conditions => {klass.primary_key.to_sym => ids},
+        :conditions => {klass.primary_key_for_sphinx.to_sym => ids},
         :include    => (options[:include] || index_options[:include]),
         :select     => (options[:select]  || index_options[:select]),
         :order      => (options[:sql_order] || index_options[:sql_order])
@@ -564,16 +606,18 @@ module ThinkingSphinx
       # the search method can retry without them. See 
       # ThinkingSphinx::Search.retry_search_on_stale_index.
       if options[:raise_on_stale] && instances.length < ids.length
-        stale_ids = ids - instances.map {|i| i.id }
+        stale_ids = ids - instances.map { |i| i.id }
         raise StaleIdsException, stale_ids
       end
 
       # if the user has specified an SQL order, return the collection
       # without rearranging it into the Sphinx order
-      return instances if options[:sql_order]
+      return instances if (options[:sql_order] || index_options[:sql_order])
 
       ids.collect { |obj_id|
-        instances.detect { |obj| obj.id == obj_id }
+        instances.detect do |obj|
+          obj.primary_key_for_sphinx == obj_id
+        end
       }
     end
     
@@ -581,6 +625,8 @@ module ThinkingSphinx
     # the number of #find's in multi-model searches.
     # 
     def instances_from_matches
+      return single_class_results if one_class
+      
       groups = results[:matches].group_by { |match|
         match[:attributes]["class_crc"]
       }
@@ -593,23 +639,18 @@ module ThinkingSphinx
       results[:matches].collect do |match|
         groups.detect { |crc, group|
           crc == match[:attributes]["class_crc"]
-        }[1].detect { |obj|
-          obj && obj.id == match[:attributes]["sphinx_internal_id"]
+        }[1].compact.detect { |obj|
+          obj.primary_key_for_sphinx == match[:attributes]["sphinx_internal_id"]
         }
       end
     end
     
+    def single_class_results
+      instances_from_class one_class, results[:matches]
+    end
+    
     def class_from_crc(crc)
-      @models_by_crc ||= begin
-        ThinkingSphinx.indexed_models.inject({}) do |hash, model|
-          hash[model.constantize.to_crc32] = model
-          Object.subclasses_of(model.constantize).each { |subclass|
-            hash[subclass.to_crc32] = subclass.name
-          }
-          hash
-        end
-      end
-      @models_by_crc[crc].constantize
+      config.models_by_crc[crc].constantize
     end
     
     def each_with_attribute(attribute, &block)
@@ -621,12 +662,15 @@ module ThinkingSphinx
     end
     
     def is_scope?(method)
-      options[:classes] && options[:classes].length == 1 &&
-      options[:classes].first.sphinx_scopes.include?(method)
+      one_class && one_class.sphinx_scopes.include?(method)
     end
     
     def add_scope(method, *args, &block)
-      search = options[:classes].first.send(method, *args, &block)
+      merge_search one_class.send(method, *args, &block)
+    end
+    
+    def merge_search(search)
+      search.args.each { |arg| args << arg }
       
       search.options.keys.each do |key|
         if HashOptions.include?(key)
@@ -635,6 +679,7 @@ module ThinkingSphinx
         elsif ArrayOptions.include?(key)
           options[key] ||= []
           options[key] += search.options[key]
+          options[key].uniq!
         else
           options[key] = search.options[key]
         end

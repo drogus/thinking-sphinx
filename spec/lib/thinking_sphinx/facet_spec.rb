@@ -12,7 +12,7 @@ describe ThinkingSphinx::Facet do
 
     it "should return the name of the facet if a Facet is passed" do
       facet = ThinkingSphinx::Facet.new(
-        ThinkingSphinx::Attribute.stub_instance(:unique_name => :attribute, :columns => ['attribute'])
+        stub('attribute', :unique_name => :attribute, :columns => ['attribute'])
       )
       ThinkingSphinx::Facet.name_for(facet).should == :attribute
     end
@@ -90,43 +90,43 @@ describe ThinkingSphinx::Facet do
     end
     
     it "should return true if the property is a string attribute" do
-      @attribute.stub_method(:type => :string)
+      @attribute.stub!(:type => :string)
       
       ThinkingSphinx::Facet.translate?(@attribute).should be_true
     end
     
     it "should return false if the property is an integer attribute" do
-      @attribute.stub_method(:type => :integer)
+      @attribute.stub!(:type => :integer)
       
       ThinkingSphinx::Facet.translate?(@attribute).should be_false
     end
     
     it "should return false if the property is a boolean attribute" do
-      @attribute.stub_method(:type => :boolean)
+      @attribute.stub!(:type => :boolean)
       
       ThinkingSphinx::Facet.translate?(@attribute).should be_false
     end
     
     it "should return false if the property is a timestamp attribute" do
-      @attribute.stub_method(:type => :datetime)
+      @attribute.stub!(:type => :datetime)
       
       ThinkingSphinx::Facet.translate?(@attribute).should be_false
     end
     
     it "should return false if the property is a float attribute" do
-      @attribute.stub_method(:type => :float)
+      @attribute.stub!(:type => :float)
       
       ThinkingSphinx::Facet.translate?(@attribute).should be_false
     end
     
     it "should return false if the property is an MVA of integer values" do
-      @attribute.stub_method(:type => :multi, :all_ints? => true)
+      @attribute.stub!(:type => :multi, :all_ints? => true)
       
       ThinkingSphinx::Facet.translate?(@attribute).should be_false
     end
     
     it "should return true if the property is an MVA of string values" do
-      @attribute.stub_method(:type => :multi, :all_ints? => false)
+      @attribute.stub!(:type => :multi, :all_ints? => false)
       
       ThinkingSphinx::Facet.translate?(@attribute).should be_true
     end
@@ -150,43 +150,43 @@ describe ThinkingSphinx::Facet do
     end
     
     it "should return true if the property is a string attribute" do
-      @attribute.stub_method(:type => :string)
+      @attribute.stub!(:type => :string)
       
       ThinkingSphinx::Facet.new(@attribute).translate?.should be_true
     end
     
     it "should return false if the property is an integer attribute" do
-      @attribute.stub_method(:type => :integer)
+      @attribute.stub!(:type => :integer)
       
       ThinkingSphinx::Facet.new(@attribute).translate?.should be_false
     end
     
     it "should return false if the property is a boolean attribute" do
-      @attribute.stub_method(:type => :boolean)
+      @attribute.stub!(:type => :boolean)
       
       ThinkingSphinx::Facet.new(@attribute).translate?.should be_false
     end
     
     it "should return false if the property is a timestamp attribute" do
-      @attribute.stub_method(:type => :datetime)
+      @attribute.stub!(:type => :datetime)
       
       ThinkingSphinx::Facet.new(@attribute).translate?.should be_false
     end
     
     it "should return false if the property is a float attribute" do
-      @attribute.stub_method(:type => :float)
+      @attribute.stub!(:type => :float)
       
       ThinkingSphinx::Facet.new(@attribute).translate?.should be_false
     end
     
     it "should return false if the property is an MVA of integer values" do
-      @attribute.stub_method(:type => :multi, :all_ints? => true)
+      @attribute.stub!(:type => :multi, :all_ints? => true)
       
       ThinkingSphinx::Facet.new(@attribute).translate?.should be_false
     end
     
     it "should return true if the property is an MVA of string values" do
-      @attribute.stub_method(:type => :multi, :all_ints? => false)
+      @attribute.stub!(:type => :multi, :all_ints? => false)
       
       ThinkingSphinx::Facet.new(@attribute).translate?.should be_true
     end
@@ -202,31 +202,31 @@ describe ThinkingSphinx::Facet do
     end
     
     it "should return the attribute name if built off an integer attribute" do
-      @attribute.stub_method(:type => :integer)
+      @attribute.stub!(:type => :integer)
       
       ThinkingSphinx::Facet.new(@attribute).attribute_name.should == "name"
     end
     
     it "should return the attribute name if built off a boolean attribute" do
-      @attribute.stub_method(:type => :boolean)
+      @attribute.stub!(:type => :boolean)
       
       ThinkingSphinx::Facet.new(@attribute).attribute_name.should == "name"
     end
     
     it "should return the attribute name if built off a float attribute" do
-      @attribute.stub_method(:type => :float)
+      @attribute.stub!(:type => :float)
       
       ThinkingSphinx::Facet.new(@attribute).attribute_name.should == "name"
     end
     
     it "should return the attribute name if built off a timestamp attribute" do
-      @attribute.stub_method(:type => :datetime)
+      @attribute.stub!(:type => :datetime)
       
       ThinkingSphinx::Facet.new(@attribute).attribute_name.should == "name"
     end
     
     it "should return the attribute name with _facet suffix if built off a string attribute" do
-      @attribute.stub_method(:type => :string)
+      @attribute.stub!(:type => :string)
       
       ThinkingSphinx::Facet.new(@attribute).attribute_name.should == "name_facet"
     end
@@ -240,13 +240,13 @@ describe ThinkingSphinx::Facet do
     end
     
     it "should return the attribute name if build off an integer MVA" do
-      @attribute.stub_method(:type => :multi, :all_ints? => true)
+      @attribute.stub!(:type => :multi, :all_ints? => true)
       
       ThinkingSphinx::Facet.new(@attribute).attribute_name.should == "name"
     end
     
     it "should return the attribute name with the _facet suffix if build off an non-integer MVA" do
-      @attribute.stub_method(:type => :multi, :all_ints? => false)
+      @attribute.stub!(:type => :multi, :all_ints? => false)
       
       ThinkingSphinx::Facet.new(@attribute).attribute_name.should == "name_facet"
     end
@@ -270,33 +270,64 @@ describe ThinkingSphinx::Facet do
       attribute = ThinkingSphinx::Attribute.new(
         @source, ThinkingSphinx::Index::FauxColumn.new(:name)
       )
-      attribute.stub_method(:type => :anything)
+      attribute.stub!(:type => :anything)
       
       ThinkingSphinx::Facet.new(attribute).type.should == :anything
     end
   end
   
   describe "#value" do
-    before :each do
-      @index  = ThinkingSphinx::Index.new(Friendship)
-      @source = ThinkingSphinx::Source.new(@index)
-      @field  = ThinkingSphinx::Field.new(
-        @source, ThinkingSphinx::Index::FauxColumn.new(:person, :first_name)
-      )
-      @facet  = ThinkingSphinx::Facet.new(@field)
+    describe 'for fields from associations' do
+      before :each do
+        @index  = ThinkingSphinx::Index.new(Friendship)
+        @source = ThinkingSphinx::Source.new(@index)
+        @field  = ThinkingSphinx::Field.new(
+          @source, ThinkingSphinx::Index::FauxColumn.new(:person, :first_name)
+        )
+        @facet  = ThinkingSphinx::Facet.new(@field)
+      end
+    
+      it "should return association values" do
+        person      = Person.find(:first)
+        friendship  = Friendship.new(:person => person)
+      
+        @facet.value(friendship, 1).should == person.first_name
+      end
+    
+      it "should return nil if the association is nil" do
+        friendship = Friendship.new(:person => nil)
+      
+        @facet.value(friendship, 1).should be_nil
+      end
+      
+      it "should return multi-level association values" do
+        person      = Person.find(:first)
+        tag         = person.tags.build(:name => 'buried')
+        friendship  = Friendship.new(:person => person)
+        
+        field  = ThinkingSphinx::Field.new(
+          @source, ThinkingSphinx::Index::FauxColumn.new(:person, :tags, :name)
+        )
+        ThinkingSphinx::Facet.new(field).value(friendship, 'buried'.to_crc32).
+          should == 'buried'
+      end
     end
     
-    it "should return association values" do
-      person      = Person.find(:first)
-      friendship  = Friendship.new(:person => person)
+    describe 'for float attributes' do
+      before :each do
+        @index     = ThinkingSphinx::Index.new(Alpha)
+        @source    = ThinkingSphinx::Source.new(@index)
+        @attribute = ThinkingSphinx::Attribute.new(
+          @source, ThinkingSphinx::Index::FauxColumn.new(:cost)
+        )
+        @facet     = ThinkingSphinx::Facet.new(@attribute)
+      end
       
-      @facet.value(friendship, 1).should == person.first_name
-    end
-    
-    it "should return nil if the association is nil" do
-      friendship = Friendship.new(:person => nil)
+      it "should translate using the given model" do
+        alpha = Alpha.new(:cost => 10.5)
       
-      @facet.value(friendship, 1).should be_nil
+        @facet.value(alpha, 1093140480).should == 10.5
+      end
     end
   end
 end

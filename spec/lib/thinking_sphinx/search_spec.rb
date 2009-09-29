@@ -7,7 +7,7 @@ describe ThinkingSphinx::Search do
     @client = Riddle::Client.new
     
     @config.stub!(:client => @client)
-    @client.stub!(:query => {:matches => [], :total_found => 41})
+    @client.stub!(:query => {:matches => [], :total_found => 41, :total => 41})
   end
   
   it "not request results from the client if not accessing items" do
@@ -32,7 +32,43 @@ describe ThinkingSphinx::Search do
     end
   end
   
+  describe '#populated?' do
+    before :each do
+      @search = ThinkingSphinx::Search.new
+    end
+    
+    it "should be false if the client request has not been made" do
+      @search.populated?.should be_false
+    end
+    
+    it "should be true once the client request has been made" do
+      @search.first
+      @search.populated?.should be_true
+    end
+  end
+  
+  describe '#results' do
+    it "should populate search results before returning" do
+      @search = ThinkingSphinx::Search.new
+      @search.populated?.should be_false
+      
+      @search.results
+      @search.populated?.should be_true
+    end
+  end
+  
   describe '#method_missing' do
+    before :each do
+      Alpha.sphinx_scope(:by_name) { |name|
+        {:conditions => {:name => name}}
+      }
+      Alpha.sphinx_scope(:ids_only) { {:ids_only => true} }
+    end
+    
+    after :each do
+      Alpha.remove_sphinx_scopes
+    end
+    
     it "should handle Array methods" do
       ThinkingSphinx::Search.new.private_methods.should be_an(Array)
     end
@@ -49,6 +85,24 @@ describe ThinkingSphinx::Search do
       lambda {
         ThinkingSphinx::Search.new.foo
       }.should raise_error(NoMethodError)
+    end
+    
+    it "should accept sphinx scopes" do
+      search = ThinkingSphinx::Search.new(:classes => [Alpha])
+      
+      lambda {
+        search.by_name('Pat')
+      }.should_not raise_error(NoMethodError)
+    end
+    
+    it "should return itself when using a sphinx scope" do
+      search = ThinkingSphinx::Search.new(:classes => [Alpha])
+      search.by_name('Pat').object_id.should == search.object_id
+    end
+    
+    it "should keep the same search object when chaining multiple scopes" do
+      search = ThinkingSphinx::Search.new(:classes => [Alpha])
+      search.by_name('Pat').ids_only.object_id.should == search.object_id
     end
   end
   
@@ -104,13 +158,16 @@ describe ThinkingSphinx::Search do
       @alpha_a, @alpha_b  = Alpha.new,  Alpha.new
       @beta_a, @beta_b    = Beta.new,   Beta.new
       
-      @alpha_a.stub!(:id => 1); @alpha_b.stub!(:id => 2)
-      @beta_a.stub!(:id => 1);  @beta_b.stub!(:id => 2)
+      @alpha_a.stub! :id => 1, :read_attribute => 1
+      @alpha_b.stub! :id => 2, :read_attribute => 2
+      @beta_a.stub!  :id => 1, :read_attribute => 1
+      @beta_b.stub!  :id => 2, :read_attribute => 2
+      
       @client.stub! :query => {
         :matches => minimal_result_hashes(@alpha_a, @beta_b, @alpha_b, @beta_a)
       }
-      Alpha.stub!(:find => [@alpha_a, @alpha_b])
-      Beta.stub!(:find => [@beta_a, @beta_b])
+      Alpha.stub! :find => [@alpha_a, @alpha_b]
+      Beta.stub!  :find => [@beta_a, @beta_b]
     end
     
     it "should issue only one select per model" do
@@ -134,6 +191,14 @@ describe ThinkingSphinx::Search do
       search[1].id.should == 2
       search[2].id.should == 2
       search[3].id.should == 1
+    end
+    
+    it "should use the requested classes to generate the index argument" do
+      @client.should_receive(:query) do |query, index, comment|
+        index.should == 'alpha_core,beta_core,beta_delta'
+      end
+      
+      ThinkingSphinx::Search.new(:classes => [Alpha, Beta]).first
     end
     
     describe 'query' do
@@ -320,6 +385,13 @@ describe ThinkingSphinx::Search do
         filter.values.should    == [1, 2, 3]
         filter.attribute.should == 'ints'
         filter.exclude?.should be_false
+      end
+      
+      it "should treat nils in arrays as 0" do
+        ThinkingSphinx::Search.new(:with => {:ints => [nil, 1, 2, 3]}).first
+        
+        filter = @client.filters.last
+        filter.values.should    == [0, 1, 2, 3]
       end
       
       it "should append inclusive filters of time ranges" do
@@ -563,8 +635,8 @@ describe ThinkingSphinx::Search do
           :classes => [Alpha]
         ).first
         
-        @client.anchor[:latitude_attr].should == :lat
-        @client.anchor[:longitude_attr].should == :lng
+        @client.anchor[:latitude_attribute].should == 'lat'
+        @client.anchor[:longitude_attribute].should == 'lng'
       end
       
       it "should detect lat and lon attributes on the given model" do
@@ -573,8 +645,8 @@ describe ThinkingSphinx::Search do
           :classes => [Beta]
         ).first
         
-        @client.anchor[:latitude_attr].should == :lat
-        @client.anchor[:longitude_attr].should == :lon
+        @client.anchor[:latitude_attribute].should == 'lat'
+        @client.anchor[:longitude_attribute].should == 'lon'
       end
       
       it "should detect latitude and longitude attributes on the given model" do
@@ -583,8 +655,8 @@ describe ThinkingSphinx::Search do
           :classes => [Person]
         ).first
         
-        @client.anchor[:latitude_attr].should == :latitude
-        @client.anchor[:longitude_attr].should == :longitude
+        @client.anchor[:latitude_attribute].should == 'latitude'
+        @client.anchor[:longitude_attribute].should == 'longitude'
       end
       
       it "should accept manually defined latitude and longitude attributes" do
@@ -595,8 +667,8 @@ describe ThinkingSphinx::Search do
           :longitude_attr => :leftright
         ).first
         
-        @client.anchor[:latitude_attr].should == :updown
-        @client.anchor[:longitude_attr].should == :leftright
+        @client.anchor[:latitude_attribute].should == 'updown'
+        @client.anchor[:longitude_attribute].should == 'leftright'
       end
       
       it "should accept manually defined latitude and longitude attributes in the given model" do
@@ -605,8 +677,8 @@ describe ThinkingSphinx::Search do
           :classes => [Friendship]
         ).first
         
-        @client.anchor[:latitude_attr].should == :person_id
-        @client.anchor[:longitude_attr].should == :person_id
+        @client.anchor[:latitude_attribute].should == 'person_id'
+        @client.anchor[:longitude_attribute].should == 'person_id'
       end
       
       it "should accept geo array for geo-position values" do
@@ -628,6 +700,35 @@ describe ThinkingSphinx::Search do
         
         @client.anchor[:latitude].should == 1.0
         @client.anchor[:longitude].should == -1.0
+      end
+    end
+    
+    describe 'sql ordering' do
+      before :each do
+        @client.stub! :query => {
+          :matches => minimal_result_hashes(@alpha_b, @alpha_a)
+        }
+        Alpha.stub! :find => [@alpha_a, @alpha_b]
+      end
+      
+      it "shouldn't re-sort SQL results based on Sphinx information" do
+        search = ThinkingSphinx::Search.new(
+          :classes    => [Alpha],
+          :sql_order  => 'id'
+        )
+        search.first.should == @alpha_a
+        search.last.should  == @alpha_b
+      end
+      
+      it "should use the option for the ActiveRecord::Base#find calls" do
+        Alpha.should_receive(:find) do |mode, options|
+          options[:order].should == 'id'
+        end
+        
+        ThinkingSphinx::Search.new(
+          :classes    => [Alpha],
+          :sql_order  => 'id'
+        ).first
       end
     end
     
@@ -699,6 +800,14 @@ describe ThinkingSphinx::Search do
     it "should allow for custom per_page values" do
       ThinkingSphinx::Search.new(:per_page => 30).total_pages.should == 2
     end
+    
+    it "should not overstep the max_matches implied limit" do
+      @client.stub!(:query => {
+        :matches => [], :total_found => 41, :total => 40
+      })
+      
+      ThinkingSphinx::Search.new.total_pages.should == 2
+    end
   end
   
   describe '#next_page' do
@@ -737,10 +846,31 @@ describe ThinkingSphinx::Search do
     end
   end
   
+  describe '#indexes' do
+    it "should default to '*'" do
+      ThinkingSphinx::Search.new.indexes.should == '*'
+    end
+    
+    it "should use given class to determine index name" do
+      ThinkingSphinx::Search.new(:classes => [Alpha]).indexes.
+        should == 'alpha_core'
+    end
+    
+    it "should add both core and delta indexes for given classes" do
+      ThinkingSphinx::Search.new(:classes => [Alpha, Beta]).indexes.
+        should == 'alpha_core,beta_core,beta_delta'
+    end
+    
+    it "should respect the :index option" do
+      ThinkingSphinx::Search.new(:classes => [Alpha], :index => '*').indexes.
+        should == '*'
+    end
+  end
+  
   describe '.each_with_groupby_and_count' do
     before :each do
       @alpha = Alpha.new
-      @alpha.stub!(:id => 1)
+      @alpha.stub!(:id => 1, :read_attribute => 1)
       
       @client.stub! :query => {
         :matches => [{
@@ -768,7 +898,7 @@ describe ThinkingSphinx::Search do
   describe '.each_with_weighting' do
     before :each do
       @alpha = Alpha.new
-      @alpha.stub!(:id => 1)
+      @alpha.stub!(:id => 1, :read_attribute => 1)
       
       @client.stub! :query => {
         :matches => [{
@@ -793,7 +923,7 @@ describe ThinkingSphinx::Search do
   describe '.each_with_*' do
     before :each do
       @alpha = Alpha.new
-      @alpha.stub!(:id => 1)
+      @alpha.stub!(:id => 1, :read_attribute => 1)
       
       @client.stub! :query => {
         :matches => [{
@@ -876,6 +1006,55 @@ describe ThinkingSphinx::Search do
       end
       
       @search.excerpt_for('string', Beta)
+    end
+    
+    it "should use the correct index in STI situations" do
+      @client.should_receive(:excerpts) do |options|
+        options[:index].should == 'person_core'
+      end
+      
+      @search.excerpt_for('string', Parent)
+    end
+  end
+  
+  describe '#search' do
+    before :each do
+      @search = ThinkingSphinx::Search.new('word',
+        :conditions => {:field  => 'field'},
+        :with       => {:int    => 5}
+      )
+    end
+    
+    it "should return itself" do
+      @search.search.object_id.should == @search.object_id
+    end
+    
+    it "should merge in arguments" do
+      @client.should_receive(:query) do |query, index, comments|
+        query.should == 'word more @field field'
+      end
+      
+      @search.search('more').first
+    end
+    
+    it "should merge conditions" do
+      @client.should_receive(:query) do |query, index, comments|
+        query.should match(/@name plato/)
+        query.should match(/@field field/)
+      end
+      
+      @search.search(:conditions => {:name => 'plato'}).first
+    end
+    
+    it "should merge filters" do
+      @search.search(:with => {:float => 1.5}).first
+      
+      @client.filters.detect { |filter|
+        filter.attribute == 'float'
+      }.should_not be_nil
+      @client.filters.detect { |filter|
+        filter.attribute == 'int'
+      }.should_not be_nil
     end
   end
 end
