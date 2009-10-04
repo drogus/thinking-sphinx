@@ -6,3 +6,4 @@ rdoc
 spec/fixtures/database.yml
 tmp
 *.swp
+*.gem
