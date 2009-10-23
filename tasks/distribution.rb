@@ -7,12 +7,13 @@ YARD::Rake::YardocTask.new do |t|
 end
 
 Jeweler::Tasks.new do |gem|
-  gem.name      = "thinking-sphinx"
-  gem.summary   = "A concise and easy-to-use Ruby library that connects ActiveRecord to the Sphinx search daemon, managing configuration, indexing and searching."
-  gem.author    = "Pat Allan"
-  gem.email     = "pat@freelancing-gods.com"
-  gem.homepage  = "http://ts.freelancing-gods.com"
-    
+  gem.name        = "thinking-sphinx-099"
+  gem.summary     = "ActiveRecord/Rails Sphinx library"
+  gem.description = "A concise and easy-to-use Ruby library that connects ActiveRecord to the Sphinx search daemon, managing configuration, indexing and searching."
+  gem.author      = "Pat Allan"
+  gem.email       = "pat@freelancing-gods.com"
+  gem.homepage    = "http://ts.freelancing-gods.com"
+  
   # s.rubyforge_project = "thinking-sphinx"
   gem.files     = FileList[
     "rails/*.rb",
@@ -24,7 +25,10 @@ Jeweler::Tasks.new do |gem|
     "vendor/**/*",
     "VERSION.yml"
   ]
-  gem.test_files = FileList["spec/**/*_spec.rb"]
+  gem.test_files = FileList[
+    "features/**/*",
+    "spec/**/*_spec.rb"
+  ]
   
   gem.add_dependency 'activerecord', '>= 1.15.6'
   
